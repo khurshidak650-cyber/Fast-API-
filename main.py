@@ -1,11 +1,4 @@
 from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Master Controller API is Live!"}
-from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI(title="SkAi Master Controller API", version="1.0")
