@@ -3,23 +3,24 @@ from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
 
-app = FastAPI(title="SkAi Web Search & Info API", version="1.0")
+app = FastAPI(title="SkAi Multi-Language Info API", version="1.0")
 
 class SearchRequest(BaseModel):
     query: str
+    language: str = "en"  # By default English rahega, aap 'hi', 'es', 'ko' bhej sakte hain
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "Web Information Fetcher is Live!"}
+    return {"status": "online", "message": "Multi-Language Web Information Fetcher is Live!"}
 
 @app.post("/fetch-info")
 def fetch_web_info(request: SearchRequest):
     search_term = request.query
+    lang = request.language
     
     try:
-        # Example ke taur par hum public search/web page se data fetch kar rahe hain
-        # Yahan aap kisi bhi website ya search result URL ko target kar sakte hain
-        url = f"https://html.duckduckgo.com/html/?q={search_term}"
+        # Search query ke sath language parameter set karna
+        url = f"https://html.duckduckgo.com/html/?q={search_term}&kl={lang}"
         headers = {"User-Agent": "Mozilla/5.0"}
         
         response = requests.post(url, headers=headers, data={"q": search_term})
@@ -28,12 +29,11 @@ def fetch_web_info(request: SearchRequest):
             soup = BeautifulSoup(response.text, 'html.parser')
             results = []
             
-            # Web page se results extract karna
             for a in soup.find_all('a', class_='result__snippet', limit=5):
                 results.append(a.text.strip())
                 
             if not results:
-                info_content = "Koi direct snippet nahi mila, par connection successful hai."
+                info_content = "Koi direct snippet nahi mila, par multi-language connection active hai."
             else:
                 info_content = " ".join(results)
         else:
@@ -44,6 +44,7 @@ def fetch_web_info(request: SearchRequest):
 
     return {
         "status": "success",
+        "language_used": lang,
         "query": search_term,
         "fetched_information": info_content
     }
