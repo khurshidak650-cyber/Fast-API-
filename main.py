@@ -1,12 +1,21 @@
+# ==========================================
+# main.py
+# SkAi Ultimate Master API Backend
+# Integrates Math, Python AI Engine, and JavaScript AI Engine
+# ==========================================
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
 import re
-import math_logic
-import python_logic  # <-- Python logic file ko yahan import kiya gaya hai
 
-app = FastAPI(title="SkAi Ultimate Master API with Python AI Engine", version="5.0")
+# Local Modular Logic Engines
+import math_logic
+import python_logic
+import javascript_logic  # <-- JavaScript engine import kiya gaya hai
+
+app = FastAPI(title="SkAi Ultimate Master API Backend", version="6.0")
 
 class SearchRequest(BaseModel):
     query: str
@@ -15,15 +24,19 @@ class SearchRequest(BaseModel):
 def analyze_user_intent(text: str):
     text_lower = text.lower()
     
-    # 1. Python Programming / Code Writer & Reader Intent Detection
-    if any(word in text_lower for word in ["python", "code", "likho", "banao", "write", "analyze", "read", "decorator", "generator", "oop", "class", "function"]):
+    # 1. JavaScript Programming & AI Engine Intent
+    if any(word in text_lower for word in ["javascript", "js", "closure", "prototype", "promise", "async", "event loop", "curry", "proxy", "quirk"]):
+        return "JavaScript Programming & AI Engine", "User JavaScript ka koi ultra-advanced concept, code likhwana ya tricky problem solve karwana chahta hai."
+    
+    # 2. Python Programming & AI Engine Intent
+    elif any(word in text_lower for word in ["python", "code", "likho", "banao", "write", "analyze", "read", "decorator", "generator", "oop", "class", "function"]):
         return "Python Programming & AI Engine", "User Python code likhwana, padhana ya koi concept sikhna chahta hai."
     
-    # 2. Math & Calculation Intent Detection
+    # 3. Math & Calculation Intent
     elif any(word in text_lower for word in ["math", "ganit", "formula", "calculate", "solve", "+", "-", "*", "/", "area", "volume", "क्षेत्रफल", "आयतन", "परिमेय"]):
         return "Mathematical / Calculation", "User math ka koi formula ya concept samajhna chahta hai."
     
-    # 3. Emotional / Psychology
+    # 4. Emotional / Psychology
     elif any(word in text_lower for word in ["sad", "dukhi", "pareshan", "lonely", "depressed"]):
         return "Emotional / Vulnerable", "User ko emotional support ki zaroorat hai."
     
@@ -32,7 +45,10 @@ def analyze_user_intent(text: str):
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "SkAi Ultimate Backend with Python AI Writer, Math & Psychology Engines is Live!"}
+    return {
+        "status": "online", 
+        "message": "SkAi Ultimate Backend with JS, Python, Math & Psychology Engines is Live!"
+    }
 
 @app.post("/fetch-info")
 def fetch_web_info(request: SearchRequest):
@@ -41,8 +57,25 @@ def fetch_web_info(request: SearchRequest):
     
     detected_intent, intent_insight = analyze_user_intent(search_term)
     
-    # Agar Python programming ya code likhne/padhne ka intent ho
-    if detected_intent == "Python Programming & AI Engine":
+    # ----------------------------------------------------
+    # ROUTING TO SPECIFIC LOCAL MODULES
+    # ----------------------------------------------------
+    
+    # Agar JavaScript ka intent ho
+    if detected_intent == "JavaScript Programming & AI Engine":
+        js_result = javascript_logic.solve_javascript_concept(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "language_used": lang,
+            "user_intent": detected_intent,
+            "intent_insight": intent_insight,
+            "source": "Local JavaScript AI Engine (javascript_logic.py)",
+            "javascript_data": js_result
+        }
+
+    # Agar Python ka intent ho
+    elif detected_intent == "Python Programming & AI Engine":
         python_result = python_logic.solve_python_concept(search_term)
         return {
             "status": "success",
@@ -54,7 +87,7 @@ def fetch_web_info(request: SearchRequest):
             "python_data": python_result
         }
         
-    # Agar Math ka intent ho, toh math_logic.py se data lo
+    # Agar Math ka intent ho
     elif detected_intent == "Mathematical / Calculation":
         math_result = math_logic.solve_math_problem(search_term)
         return {
@@ -67,7 +100,9 @@ def fetch_web_info(request: SearchRequest):
             "math_data": math_result
         }
     
-    # Baaki sabhi queries ke liye Web Search
+    # ----------------------------------------------------
+    # FALLBACK: Web Search for General Queries
+    # ----------------------------------------------------
     try:
         url = f"https://html.duckduckgo.com/html/?q={search_term}&kl={lang}"
         headers = {"User-Agent": "Mozilla/5.0"}
