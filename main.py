@@ -2,44 +2,63 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
+import re
+import math_logic
 
-app = FastAPI(title="SkAi Psychology & Info API", version="2.0")
+app = FastAPI(title="SkAi Ultimate Master API with Local Math Engine", version="4.0")
 
 class SearchRequest(BaseModel):
     query: str
     language: str = "hi"  # Default language
 
-def analyze_human_psychology(text: str):
+def analyze_user_intent(text: str):
     text_lower = text.lower()
     
-    # Basic Psychology & Intent Analysis Rules
-    if any(word in text_lower for word in ["sad", "dukhi", "pareshan", "lonely", "depressed", "rona"]):
-        mood = "Emotional / Vulnerable"
-        psychology_note = "User ko empathy, support aur ek dost ki tarah samjhne ki zaroorat hai."
+    # 1. Math & Calculation Intent Detection
+    if any(word in text_lower for word in ["math", "ganit", "formula", "calculate", "solve", "+", "-", "*", "/", "area", "volume", "क्षेत्रफल", "आयतन", "परिमेय", "rational", "fraction", "bhinn", "algebra"]):
+        return "Mathematical / Calculation", "User math ka koi formula, calculation ya concept samajhna chahta hai."
+    
+    # 2. Emotional / Psychology Intent Detection
+    elif any(word in text_lower for word in ["sad", "dukhi", "pareshan", "lonely", "depressed", "rona"]):
+        return "Emotional / Vulnerable", "User ko empathy, support aur ek dost ki tarah samjhne ki zaroorat hai."
+    
+    # 3. Curious / Analytical Detection
     elif any(word in text_lower for word in ["why", "kaise", "kya", "explain", "soch", "mind", "psychology"]):
-        mood = "Curious / Analytical"
-        psychology_note = "User deep information aur logical explanation chahta hai."
+        return "Curious / Analytical", "User deep information aur logical explanation chahta hai."
+    
+    # 4. Greetings
     elif any(word in text_lower for word in ["hello", "hi", "hey", "namaste"]):
-        mood = "Friendly / Greeting"
-        psychology_note = "User ke sathwarm aur welcoming tone me baat karni chahiye."
+        return "Friendly / Greeting", "User ke sath warm aur welcoming tone me baat karni chahiye."
+    
     else:
-        mood = "Neutral / General Inquiry"
-        psychology_note = "Direct aur helpful information deni chahiye."
-        
-    return mood, psychology_note
+        return "Neutral / General Inquiry", "Direct aur helpful information deni chahiye."
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "message": "SkAi Psychology & Multi-Language Backend is Live!"}
+    return {"status": "online", "message": "SkAi Ultimate Backend with Local Math Engine & Psychology is Live!"}
 
 @app.post("/fetch-info")
 def fetch_web_info(request: SearchRequest):
     search_term = request.query
     lang = request.language
     
-    # Human Psychology Analysis apply karna
-    detected_mood, psych_insight = analyze_human_psychology(search_term)
+    # Detect intent
+    detected_intent, intent_insight = analyze_user_intent(search_term)
     
+    # If math intent, pull directly from our local math_logic.py without searching web!
+    if detected_intent == "Mathematical / Calculation":
+        math_result = math_logic.solve_math_problem(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "language_used": lang,
+            "user_intent": detected_intent,
+            "intent_insight": intent_insight,
+            "source": "Local Math Engine (math_logic.py)",
+            "math_data": math_result
+        }
+    
+    # Otherwise, execute web search for general or psychological queries
     try:
         url = f"https://html.duckduckgo.com/html/?q={search_term}&kl={lang}"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -54,7 +73,7 @@ def fetch_web_info(request: SearchRequest):
                 results.append(a.text.strip())
                 
             if not results:
-                info_content = "Live search se direct data nahi mila, par psychology analysis active hai."
+                info_content = "Live search se direct data nahi mila."
             else:
                 info_content = " ".join(results)
         else:
@@ -67,7 +86,8 @@ def fetch_web_info(request: SearchRequest):
         "status": "success",
         "query": search_term,
         "language_used": lang,
-        "user_mood": detected_mood,
-        "psychology_insight": psych_insight,
+        "user_intent": detected_intent,
+        "intent_insight": intent_insight,
+        "source": "Web Search",
         "fetched_information": info_content
-    }
+            }
