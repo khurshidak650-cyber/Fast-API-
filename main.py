@@ -116,4 +116,4 @@ def fetch_web_info(request: SearchRequest):
         "user_intent": detected_intent,
         "source": "Web Search",
         "fetched_information": info_content
-    }
+        }
