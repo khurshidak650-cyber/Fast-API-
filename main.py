@@ -1,6 +1,6 @@
 # ==========================================
 # main.py
-# SkAi Ultimate Master API Backend (Google Search + Multilingual + Pro Analyzer)
+# SkAi Ultimate Master API Backend
 # ==========================================
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
@@ -13,11 +13,11 @@ import re
 
 # Local Modular Logic Engines
 import math_logic
-import python_logic        # Dedicated Python Engine
-import javascript_logic    # Dedicated JavaScript Engine
-import programming_engine  # Universal Engine for ALL OTHER languages (C++, Java, Rust, SQL, etc.)
+import python_logic
+import javascript_logic
+import programming_engine
 
-app = FastAPI(title="SkAi Ultimate Master API", version="11.0")
+app = FastAPI(title="SkAi Ultimate Master API", version="11.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,22 +25,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Optional Official Google Custom Search Credentials (Environment Variables)
 GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY", "").strip()
 GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID", "").strip()
 
 
 class SearchRequest(BaseModel):
     query: str
-    language: str = "auto"               # "auto" = query ki bhasha khud pehchano
-    reply_language: Optional[str] = None # Jis bhasha me jawab chahiye
-    response_style: str = "professional" # "concise", "professional", "tutor"
-    force_google: bool = False           # True karne par local engine ke bajay Google search se bhi data layega
+    language: str = "auto"
+    reply_language: Optional[str] = None
+    response_style: str = "professional"
+    force_google: bool = False
 
 
 LANGUAGE_NAMES: Dict[str, str] = {
-    "hi": "Hindi (Devanagari)",
-    "hinglish": "Hinglish (Hindi written in Roman script)",
+    "hi": "Hindi",
+    "hinglish": "Hinglish",
     "en": "English",
     "mr": "Marathi",
     "bn": "Bengali",
@@ -81,37 +80,16 @@ DDG_REGION_MAP: Dict[str, str] = {
 }
 
 EMOTIONAL_SUPPORT_TEMPLATES: Dict[str, str] = {
-    "hi": (
-        "मैं समझ सकता हूँ कि अभी समय थोड़ा भारी लग रहा है। "
-        "आप अकेले नहीं हैं—एक गहरी साँस लें और अभी केवल एक ऐसी बात साझा करें "
-        "जो सबसे ज़्यादा परेशान कर रही है, ताकि हम मिलकर उसका समाधान निकाल सकें।"
-    ),
-    "hinglish": (
-        "Main samajh sakta hoon ki abhi waqt thoda bhari lag raha hai. "
-        "Aap akele nahi hain—ek gehri saans lein aur abhi sirf ek chhoti si baat share karein "
-        "jo sabse zyada pareshan kar rahi hai, taaki hum milkar uska rasta nikaal sakein."
-    ),
-    "en": (
-        "I hear that things feel heavy right now. You don't have to carry it all at once—"
-        "take a slow breath and share just one thing that's weighing on you most so we can work through it together."
-    ),
-    "mr": (
-        "मला समजते की सध्याचा काळ थोडा कठीण वाटत आहे. तुम्ही एकटे नाही आहात—दीर्घ श्वास घ्या "
-        "आणि तुम्हाला सर्वात जास्त त्रास देणारी एक गोष्ट सांगा, जेणेकरून आपण एकत्र मार्ग काढू शकू."
-    ),
-    "es": (
-        "Entiendo que este momento se sienta pesado. No estás solo; respira hondo "
-        "y comparte solo una cosa que te preocupe más ahora mismo para buscar juntos una salida."
-    ),
-    "fr": (
-        "Je comprends que ce moment soit difficile. Vous n'êtes pas seul ; respirez calmement "
-        "et partagez simplement ce qui vous pèse le plus afin d'avancer ensemble."
-    ),
+    "hi": "मैं समझ सकता हूँ कि अभी समय थोड़ा भारी लग रहा है। आप अकेले नहीं हैं—एक गहरी साँस लें और जो बात सबसे ज़्यादा परेशान कर रही है, उसे साझा करें।",
+    "hinglish": "Main samajh sakta hoon ki abhi waqt thoda bhari lag raha hai. Aap akele nahi hain—ek gehri saans lein aur jo baat sabse zyada pareshan kar rahi hai, woh share karein.",
+    "en": "I hear that things feel heavy right now. You are not alone—take a slow breath and share what is weighing on you most.",
+    "mr": "मला समजते की सध्याचा काळ थोडा कठीण वाटत आहे. तुम्ही एकटे नाही आहात—दीर्घ श्वास घ्या आणि सर्वात जास्त त्रास देणारी गोष्ट सांगा.",
+    "es": "Entiendo que este momento se sienta pesado. No estás solo; respira hondo y comparte lo que más te preocupa ahora mismo.",
+    "fr": "Je comprends que ce moment soit difficile. Vous n'êtes pas seul ; respirez calmement et partagez ce qui vous pèse le plus.",
 }
 
 
 def has_word(text: str, words: List[str]) -> bool:
-    """Exact word/phrase boundary match taaki false positives na aayen."""
     for w in words:
         pattern = r"(?<!\w)" + re.escape(w.lower()) + r"(?!\w)"
         if re.search(pattern, text):
@@ -120,7 +98,6 @@ def has_word(text: str, words: List[str]) -> bool:
 
 
 def detect_language_profile(text: str) -> Dict[str, str]:
-    """Kisi bhi bhasha ya script ko pehchanne ka function."""
     script_checks = [
         (r"[\u0980-\u09FF]", "bn", "bengali"),
         (r"[\u0B80-\u0BFF]", "ta", "tamil"),
@@ -154,23 +131,22 @@ def detect_language_profile(text: str) -> Dict[str, str]:
     if has_word(lower, hinglish_markers):
         return {"detected_code": "hinglish", "detected_name": LANGUAGE_NAMES["hinglish"], "script_type": "latin_roman"}
 
-    if has_word(lower, ["hola", "qué", "que", "cómo", "como", "gracias", "por favor", "ayuda"]):
+    if has_word(lower, ["hola", "que", "como", "gracias", "por favor", "ayuda"]):
         return {"detected_code": "es", "detected_name": LANGUAGE_NAMES["es"], "script_type": "latin_roman"}
 
-    if has_word(lower, ["bonjour", "comment", "pourquoi", "merci", "s'il vous plaît", "aide"]):
+    if has_word(lower, ["bonjour", "comment", "pourquoi", "merci", "aide"]):
         return {"detected_code": "fr", "detected_name": LANGUAGE_NAMES["fr"], "script_type": "latin_roman"}
 
     if has_word(lower, ["hallo", "wie", "warum", "danke", "bitte", "hilfe"]):
         return {"detected_code": "de", "detected_name": LANGUAGE_NAMES["de"], "script_type": "latin_roman"}
 
-    if has_word(lower, ["ciao", "come", "perché", "grazie", "aiuto"]):
+    if has_word(lower, ["ciao", "come", "perche", "grazie", "aiuto"]):
         return {"detected_code": "it", "detected_name": LANGUAGE_NAMES["it"], "script_type": "latin_roman"}
 
     return {"detected_code": "en", "detected_name": LANGUAGE_NAMES["en"], "script_type": "latin_roman"}
 
 
 def resolve_reply_language(detected_code: str, request_lang: str, explicit_reply_lang: Optional[str]) -> Dict[str, str]:
-    """Tay karta hai ki API ko kis bhasha me jawab dena chahiye."""
     if explicit_reply_lang:
         code = explicit_reply_lang.strip().lower()
     elif request_lang and request_lang.strip().lower() != "auto":
@@ -179,23 +155,7 @@ def resolve_reply_language(detected_code: str, request_lang: str, explicit_reply
         code = detected_code
 
     lang_label = LANGUAGE_NAMES.get(code, code)
-    if code == "hinglish":
-        instruction = (
-            "Respond naturally in Hinglish (Hindi written in Roman/Latin script), "
-            "matching how a helpful Indian tech mentor speaks. Keep technical terms in English."
-        )
-    elif code == "hi":
-        instruction = (
-            "Respond clearly in natural, easy-to-understand Hindi (Devanagari script). "
-            "Keep standard technical/code terms readable."
-        )
-    elif code == "en":
-        instruction = "Respond clearly, concisely, and professionally in English."
-    else:
-        instruction = (
-            f"Respond naturally and accurately in {lang_label} (code: '{code}'). "
-            "Match the user's language and keep code blocks/technical identifiers intact."
-        )
+    instruction = f"Respond clearly and accurately in {lang_label} ({code})."
 
     return {
         "reply_language_code": code,
@@ -206,12 +166,11 @@ def resolve_reply_language(detected_code: str, request_lang: str, explicit_reply
 
 
 def detect_tone(text_lower: str) -> str:
-    """User ke tone ko pehchanta hai."""
     emotional_words = [
         "sad", "dukhi", "pareshan", "lonely", "depressed", "thak", "dar",
-        "दुखी", "परेशान", "उदास", "अकेला", "triste", "cansado", "tristeza"
+        "दुखी", "परेशान", "उदास", "अकेला", "triste", "cansado"
     ]
-    error_words = ["error", "bug", "not working", "kyun nahi chal", "fix", "issue", "एरर", "काम नहीं"]
+    error_words = ["error", "bug", "not working", "kyun nahi chal", "fix", "issue", "एरर"]
     compare_words = ["compare", "vs", "difference", "antar", "fark", "अंतर", "फर्क"]
 
     if any(w in text_lower for w in emotional_words):
@@ -224,7 +183,6 @@ def detect_tone(text_lower: str) -> str:
 
 
 def classify_request_type(text_lower: str) -> str:
-    """User ko kis tarah ka output chahiye."""
     if has_word(text_lower, ["code", "banao", "likho", "program", "script", "implement", "function", "कोड", "लिखो", "बनाओ"]):
         return "code_generation"
     if has_word(text_lower, ["calculate", "solve", "area", "volume", "क्षेत्रफल", "आयतन", "formula", "ganit", "math", "गणित", "सूत्र"]):
@@ -237,7 +195,6 @@ def classify_request_type(text_lower: str) -> str:
 
 
 def analyze_user_intent(text: str, lang_profile: Dict[str, str], reply_lang: Dict[str, str]) -> Dict[str, Any]:
-    """Human question ko bhasha, tone, type aur intent ke level par analyze karta hai."""
     text_lower = text.lower().strip()
     tone = detect_tone(text_lower)
     request_type = classify_request_type(text_lower)
@@ -253,22 +210,22 @@ def analyze_user_intent(text: str, lang_profile: Dict[str, str], reply_lang: Dic
 
     if request_type == "emotional_support":
         route_intent = "Emotional / Vulnerable"
-        insight = "User ko empathy, calm tone aur supportive guidance chahiye."
+        insight = "User needs calm and supportive guidance."
     elif has_word(text_lower, ["python", "decorator", "generator", "oop in python", "pandas", "numpy", "fastapi", "flask", "पायथन"]):
         route_intent = "Python Dedicated Engine"
-        insight = "User Python concepts ya code ke baare me pooch raha hai."
+        insight = "Python concept or code query."
     elif has_word(text_lower, ["javascript", "js", "closure", "prototype", "promise", "async js", "nodejs", "react", "जावास्क्रिप्ट"]):
         route_intent = "JavaScript Dedicated Engine"
-        insight = "User JavaScript concepts ya code ke baare me pooch raha hai."
+        insight = "JavaScript concept or code query."
     elif has_word(text_lower, ["c++", "cpp", "java", "rust", "go", "golang", "c#", "sql", "code", "banao", "likho", "programming", "compiler", "dsa", "algorithm", "कोड", "प्रोग्रामिंग"]):
         route_intent = "Universal Programming Engine"
-        insight = "User general programming ya kisi programming language ka solution chahta hai."
+        insight = "General programming or language query."
     elif request_type == "calculation_or_formula" or any(op in text_lower for op in ["+", "-", "*", "/", "=", "^"]):
         route_intent = "Mathematical / Calculation"
-        insight = "User ko formula ya step-by-step calculation chahiye."
+        insight = "Math formula or calculation query."
     else:
         route_intent = "Neutral / General Inquiry"
-        insight = "Direct, structured aur helpful jawab dena chahiye."
+        insight = "Direct and structured answer needed."
 
     return {
         "route_intent": route_intent,
@@ -282,7 +239,6 @@ def analyze_user_intent(text: str, lang_profile: Dict[str, str], reply_lang: Dic
 
 
 def build_response_blueprint(analysis: Dict[str, Any], style: str) -> Dict[str, Any]:
-    """Answer ka structure aur bhasha rule define karta hai."""
     req_type = analysis["request_type"]
     tone = analysis["tone"]
     reply_lang = analysis["reply_language"]
@@ -290,9 +246,9 @@ def build_response_blueprint(analysis: Dict[str, Any], style: str) -> Dict[str, 
     if tone == "empathetic_support":
         sections = ["Warm Acknowledgement", "Calm Perspective", "Small Actionable Step"]
     elif req_type == "code_generation":
-        sections = ["Direct Answer / Approach", "Clean Code Example", "How It Works", "Edge Cases & Next Step"]
+        sections = ["Direct Approach", "Clean Code Example", "How It Works", "Next Step"]
     elif req_type == "calculation_or_formula":
-        sections = ["Formula / Rule", "Step-by-Step Calculation", "Final Result"]
+        sections = ["Formula", "Step-by-Step Calculation", "Final Result"]
     elif req_type == "comparison":
         sections = ["Quick Summary", "Key Differences", "When to Choose Which"]
     else:
@@ -309,16 +265,14 @@ def build_response_blueprint(analysis: Dict[str, Any], style: str) -> Dict[str, 
         "language_instruction": reply_lang["language_instruction"],
         "recommended_sections": sections,
         "rules": [
-            f"Jawab hamesha {reply_lang['reply_language_name']} me do.",
-            "Pehle seedha aur clear jawab do, phir detail do.",
-            "Jahan zaroorat ho wahan short bullet points aur example use karo.",
-            "Search results se jo fact mile use verify karke simple bhasha me samjhao."
+            f"Reply in {reply_lang['reply_language_name']}.",
+            "Give a direct answer first, then details.",
+            "Use clear points and examples when helpful.",
         ],
     }
 
 
 def build_google_search_query(query: str, analysis: Dict[str, Any]) -> str:
-    """User ke sawaal ko search-friendly query me badalta hai."""
     key_terms = analysis.get("key_terms", [])
     if len(key_terms) >= 2:
         return " ".join(key_terms)
@@ -326,16 +280,10 @@ def build_google_search_query(query: str, analysis: Dict[str, Any]) -> str:
 
 
 def search_google(query: str, analysis: Dict[str, Any], num_results: int = 5) -> Dict[str, Any]:
-    """
-    Google Search se results laata hai:
-    1) Agar GOOGLE_SEARCH_API_KEY aur GOOGLE_CSE_ID set hain -> Official Google Custom Search JSON API
-    2) Warna fallback search engine se clean results nikaalta hai.
-    """
     optimized_query = build_google_search_query(query, analysis)
     reply_lang = analysis["reply_language"]
     items: List[Dict[str, str]] = []
 
-    # Method 1: Official Google Custom Search API
     if GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID:
         try:
             api_url = "https://www.googleapis.com/customsearch/v1"
@@ -362,7 +310,6 @@ def search_google(query: str, analysis: Dict[str, Any], num_results: int = 5) ->
         except requests.RequestException:
             pass
 
-    # Method 2: Fallback Web Search (jab API key configure na ho)
     try:
         url = "https://html.duckduckgo.com/html/"
         headers = {
@@ -386,28 +333,24 @@ def search_google(query: str, analysis: Dict[str, Any], num_results: int = 5) ->
                     items.append({"title": title, "snippet": snippet, "link": link})
     except requests.RequestException as e:
         return {
-            "provider": "Fallback Search (Error)",
+            "provider": "Fallback Search Error",
             "search_query_used": optimized_query,
             "error": str(e),
             "results": [],
         }
 
     return {
-        "provider": "Fallback Web Search (Set GOOGLE_SEARCH_API_KEY & GOOGLE_CSE_ID for Official Google API)",
+        "provider": "Fallback Web Search",
         "search_query_used": optimized_query,
         "results": items,
     }
 
 
 def synthesize_search_answer(query: str, search_data: Dict[str, Any], blueprint: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Search results ko padh kar ek structured answer draft banata hai taaki
-    API ko pata chale ki search data se jawab kaise frame karna hai.
-    """
     results = search_data.get("results", [])
     if not results:
         return {
-            "direct_answer": "Search se is sawaal par seedha data nahi mil paaya. Kripya sawaal ko thoda aur specific ya simple shabdon me likhein.",
+            "direct_answer": "No direct search result found. Try a clearer or more specific query.",
             "key_points": [],
             "sources": [],
             "answer_guide": blueprint,
@@ -433,7 +376,7 @@ def synthesize_search_answer(query: str, search_data: Dict[str, Any], blueprint:
 def read_root():
     return {
         "status": "online",
-        "message": "SkAi Multi-Engine Backend is Live with Google Search, Multilingual & Pro Analyzer!",
+        "message": "SkAi Multi-Engine Backend is Live!",
         "google_api_configured": bool(GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID),
     }
 
@@ -445,7 +388,7 @@ def fetch_web_info(request: SearchRequest):
     if not search_term:
         return {
             "status": "error",
-            "message": "Query empty hai. Please enter a question or topic."
+            "message": "Query is empty."
         }
 
     lang_profile = detect_language_profile(search_term)
@@ -458,7 +401,6 @@ def fetch_web_info(request: SearchRequest):
     route_intent = analysis["route_intent"]
     blueprint = build_response_blueprint(analysis, request.response_style)
 
-    # 1. Emotional / Support Route
     if route_intent == "Emotional / Vulnerable":
         code = reply_lang["reply_language_code"]
         support_msg = EMOTIONAL_SUPPORT_TEMPLATES.get(code, EMOTIONAL_SUPPORT_TEMPLATES["en"])
@@ -474,7 +416,6 @@ def fetch_web_info(request: SearchRequest):
             "data": {"message": support_msg}
         }
 
-    # Agar user ne force_google=True bheja hai to direct Google search + structured answer
     if request.force_google:
         google_data = search_google(search_term, analysis)
         framed = synthesize_search_answer(search_term, google_data, blueprint)
@@ -482,4 +423,79 @@ def fetch_web_info(request: SearchRequest):
             "status": "success",
             "query": search_term,
             "detected_language": lang_profile,
-            "reply_
+            "reply_language": reply_lang,
+            "analysis": analysis,
+            "response_blueprint": blueprint,
+            "source": google_data["provider"],
+            "search_details": google_data,
+            "framed_answer": framed,
+            "fetched_information": framed["direct_answer"],
+        }
+
+    if route_intent == "Python Dedicated Engine":
+        py_result = python_logic.solve_python_concept(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "detected_language": lang_profile,
+            "reply_language": reply_lang,
+            "analysis": analysis,
+            "response_blueprint": blueprint,
+            "source": "Dedicated Python Engine",
+            "data": py_result
+        }
+
+    if route_intent == "JavaScript Dedicated Engine":
+        js_result = javascript_logic.solve_javascript_concept(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "detected_language": lang_profile,
+            "reply_language": reply_lang,
+            "analysis": analysis,
+            "response_blueprint": blueprint,
+            "source": "Dedicated JavaScript Engine",
+            "data": js_result
+        }
+
+    if route_intent == "Universal Programming Engine":
+        prog_result = programming_engine.solve_programming_query(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "detected_language": lang_profile,
+            "reply_language": reply_lang,
+            "analysis": analysis,
+            "response_blueprint": blueprint,
+            "source": "Universal Programming Engine",
+            "data": prog_result
+        }
+
+    if route_intent == "Mathematical / Calculation":
+        math_result = math_logic.solve_math_problem(search_term)
+        return {
+            "status": "success",
+            "query": search_term,
+            "detected_language": lang_profile,
+            "reply_language": reply_lang,
+            "analysis": analysis,
+            "response_blueprint": blueprint,
+            "source": "Local Math Engine",
+            "data": math_result
+        }
+
+    google_data = search_google(search_term, analysis)
+    framed = synthesize_search_answer(search_term, google_data, blueprint)
+
+    return {
+        "status": "success",
+        "query": search_term,
+        "detected_language": lang_profile,
+        "reply_language": reply_lang,
+        "analysis": analysis,
+        "response_blueprint": blueprint,
+        "source": google_data["provider"],
+        "search_details": google_data,
+        "framed_answer": framed,
+        "fetched_information": framed["direct_answer"],
+                               }
