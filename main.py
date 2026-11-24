@@ -1,6 +1,6 @@
 # ==========================================
 # main.py
-# SkAi Ultimate Master API Backend
+# SkAi Ultimate Master API (No Gemini Key Needed - Smart Reasoning & Composer)
 # ==========================================
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
@@ -11,13 +11,12 @@ from bs4 import BeautifulSoup
 import os
 import re
 
-# Local Modular Logic Engines
 import math_logic
 import python_logic
 import javascript_logic
 import programming_engine
 
-app = FastAPI(title="SkAi Ultimate Master API", version="11.2")
+app = FastAPI(title="SkAi Ultimate Master API", version="13.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +34,7 @@ class SearchRequest(BaseModel):
     reply_language: Optional[str] = None
     response_style: str = "professional"
     force_google: bool = False
+    show_thinking: bool = True
 
 
 LANGUAGE_NAMES: Dict[str, str] = {
@@ -155,7 +155,7 @@ def resolve_reply_language(detected_code: str, request_lang: str, explicit_reply
         code = detected_code
 
     lang_label = LANGUAGE_NAMES.get(code, code)
-    instruction = f"Respond clearly and accurately in {lang_label} ({code})."
+    instruction = f"Respond clearly, naturally, and accurately in {lang_label} ({code})."
 
     return {
         "reply_language_code": code,
@@ -238,6 +238,32 @@ def analyze_user_intent(text: str, lang_profile: Dict[str, str], reply_lang: Dic
     }
 
 
+def think_through_question(query: str, analysis: Dict[str, Any], force_google: bool) -> List[str]:
+    """Khud se sochne ka step-by-step logic (bina external AI key ke)."""
+    lang_code = analysis["reply_language"]["reply_language_code"]
+    req_type = analysis["request_type"]
+    terms = ", ".join(analysis.get("key_terms", [])) or query
+    route = analysis["route_intent"]
+
+    if lang_code == "hi":
+        s1 = f"1. प्रश्न समझना: उपयोगकर्ता ने '{query}' पूछा है, जिसका मुख्य विषय '{terms}' है।"
+        s2 = f"2. उत्तर का प्रकार: यह '{req_type}' श्रेणी का प्रश्न है, इसलिए मुख्य बात पहले और स्पष्ट बिंदु उसके बाद रखे जाएंगे।"
+        s3 = f"3. स्रोत तय करना: {'लाइव वेब सर्च से तथ्य लेकर उत्तर बनाया जाएगा।' if (force_google or route == 'Neutral / General Inquiry') else f'{route} से प्राप्त जानकारी का उपयोग किया जाएगा।'}"
+        return [s1, s2, s3]
+
+    if lang_code == "en":
+        s1 = f"1. Understanding the question: The user asked '{query}', focusing on '{terms}'."
+        s2 = f"2. Answer strategy: Since this is a '{req_type}' query, I will lead with a clear direct summary followed by structured points."
+        s3 = f"3. Data source: {'Using live web search snippets to build a clear answer.' if (force_google or route == 'Neutral / General Inquiry') else f'Using {route} to solve this accurately.'}"
+        return [s1, s2, s3]
+
+    # Hinglish / default
+    s1 = f"1. Sawaal samajhna: User ne '{query}' pucha hai jiska main focus '{terms}' par hai."
+    s2 = f"2. Answer style: Yeh '{req_type}' type ka sawaal hai, isliye pehle seedha jawab aur phir clear points/example banayenge."
+    s3 = f"3. Data source: {'Live search se mile points ko samajh kar jawab tayar karenge.' if (force_google or route == 'Neutral / General Inquiry') else f'{route} ke output ko samajh kar jawab tayar karenge.'}"
+    return [s1, s2, s3]
+
+
 def build_response_blueprint(analysis: Dict[str, Any], style: str) -> Dict[str, Any]:
     req_type = analysis["request_type"]
     tone = analysis["tone"]
@@ -266,8 +292,8 @@ def build_response_blueprint(analysis: Dict[str, Any], style: str) -> Dict[str, 
         "recommended_sections": sections,
         "rules": [
             f"Reply in {reply_lang['reply_language_name']}.",
-            "Give a direct answer first, then details.",
-            "Use clear points and examples when helpful.",
+            "Give a direct answer first, then clear points.",
+            "Keep explanation simple and helpful.",
         ],
     }
 
@@ -350,7 +376,7 @@ def synthesize_search_answer(query: str, search_data: Dict[str, Any], blueprint:
     results = search_data.get("results", [])
     if not results:
         return {
-            "direct_answer": "No direct search result found. Try a clearer or more specific query.",
+            "direct_answer": "Search se is sawaal par seedha data nahi mila. Kripya sawaal ko thoda aur specific ya simple likhein.",
             "key_points": [],
             "sources": [],
             "answer_guide": blueprint,
@@ -372,130 +398,82 @@ def synthesize_search_answer(query: str, search_data: Dict[str, Any], blueprint:
     }
 
 
-@app.get("/")
-def read_root():
-    return {
-        "status": "online",
-        "message": "SkAi Multi-Engine Backend is Live!",
-        "google_api_configured": bool(GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID),
-    }
+def _extract_bullets_from_any(obj: Any, depth: int = 0) -> List[str]:
+    """Kisi bhi nested dict/list/str engine output se kaam ki lines nikalta hai."""
+    if depth > 3 or obj is None:
+        return []
+    if isinstance(obj, str):
+        clean = re.sub(r"\s+", " ", obj).strip()
+        return [clean] if clean else []
+    if isinstance(obj, list):
+        out: List[str] = []
+        for item in obj[:5]:
+            out.extend(_extract_bullets_from_any(item, depth + 1))
+        return out[:6]
+    if isinstance(obj, dict):
+        lines: List[str] = []
+        priority_keys = ["direct_answer", "summary", "explanation", "answer", "result", "formula", "code", "output", "message"]
+        for k in priority_keys:
+            if k in obj and obj[k]:
+                val_str = re.sub(r"\s+", " ", str(obj[k])).strip()
+                if val_str:
+                    lines.append(f"{k.replace('_', ' ').title()}: {val_str}")
+        if not lines:
+            for k, v in list(obj.items())[:5]:
+                if v:
+                    val_str = re.sub(r"\s+", " ", str(v)).strip()
+                    lines.append(f"{k.replace('_', ' ').title()}: {val_str}")
+        if "key_points" in obj and isinstance(obj["key_points"], list):
+            for kp in obj["key_points"][:3]:
+                kp_clean = re.sub(r"\s+", " ", str(kp)).strip()
+                if kp_clean:
+                    lines.append(kp_clean)
+        return lines[:6]
+    return [str(obj)]
 
 
-@app.post("/fetch-info")
-def fetch_web_info(request: SearchRequest):
-    search_term = request.query.strip()
+def compose_smart_answer(
+    query: str,
+    analysis: Dict[str, Any],
+    blueprint: Dict[str, Any],
+    raw_data: Any,
+) -> str:
+    """
+    Bina kisi external LLM key ke, engine ya search data ko samajh kar
+    ek saaf, structured aur helpful jawab banata hai.
+    """
+    lang_code = analysis["reply_language"]["reply_language_code"]
+    req_type = analysis["request_type"]
 
-    if not search_term:
-        return {
-            "status": "error",
-            "message": "Query is empty."
-        }
+    if req_type == "emotional_support" and isinstance(raw_data, dict) and "message" in raw_data:
+        return str(raw_data["message"])
 
-    lang_profile = detect_language_profile(search_term)
-    reply_lang = resolve_reply_language(
-        detected_code=lang_profile["detected_code"],
-        request_lang=request.language,
-        explicit_reply_lang=request.reply_language,
-    )
-    analysis = analyze_user_intent(search_term, lang_profile, reply_lang)
-    route_intent = analysis["route_intent"]
-    blueprint = build_response_blueprint(analysis, request.response_style)
+    bullets = _extract_bullets_from_any(raw_data)
+    if not bullets:
+        if lang_code == "hi":
+            return f"'{query}' के लिए फिलहाल कोई सीधा उत्तर नहीं मिल सका। कृपया प्रश्न को थोड़ा और स्पष्ट लिखें।"
+        if lang_code == "en":
+            return f"I couldn't find a direct answer for '{query}'. Please try rephrasing with a bit more detail."
+        return f"'{query}' ke liye abhi seedha jawab nahi mil paaya. Kripya sawaal ko thoda aur clear likhein."
 
-    if route_intent == "Emotional / Vulnerable":
-        code = reply_lang["reply_language_code"]
-        support_msg = EMOTIONAL_SUPPORT_TEMPLATES.get(code, EMOTIONAL_SUPPORT_TEMPLATES["en"])
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": "Emotional Support Handler",
-            "answer_summary": support_msg,
-            "data": {"message": support_msg}
-        }
+    lead = bullets[0]
+    rest = bullets[1:4]
 
-    if request.force_google:
-        google_data = search_google(search_term, analysis)
-        framed = synthesize_search_answer(search_term, google_data, blueprint)
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": google_data["provider"],
-            "search_details": google_data,
-            "framed_answer": framed,
-            "fetched_information": framed["direct_answer"],
-        }
+    if lang_code == "hi":
+        heading_main = "मुख्य उत्तर"
+        heading_points = "महत्वपूर्ण बिंदु"
+        footer = "यदि आप इसे और सरल उदाहरण या गहराई से समझना चाहते हैं, तो पूछें।"
+    elif lang_code == "en":
+        heading_main = "Direct Answer"
+        heading_points = "Key Points"
+        footer = "Let me know if you want a simpler example or a deeper breakdown."
+    else:
+        heading_main = "Main Jawab"
+        heading_points = "Zaroori Points"
+        footer = "Agar iska aasan example ya aur detail chahiye to batayein."
 
-    if route_intent == "Python Dedicated Engine":
-        py_result = python_logic.solve_python_concept(search_term)
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": "Dedicated Python Engine",
-            "data": py_result
-        }
-
-    if route_intent == "JavaScript Dedicated Engine":
-        js_result = javascript_logic.solve_javascript_concept(search_term)
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": "Dedicated JavaScript Engine",
-            "data": js_result
-        }
-
-    if route_intent == "Universal Programming Engine":
-        prog_result = programming_engine.solve_programming_query(search_term)
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": "Universal Programming Engine",
-            "data": prog_result
-        }
-
-    if route_intent == "Mathematical / Calculation":
-        math_result = math_logic.solve_math_problem(search_term)
-        return {
-            "status": "success",
-            "query": search_term,
-            "detected_language": lang_profile,
-            "reply_language": reply_lang,
-            "analysis": analysis,
-            "response_blueprint": blueprint,
-            "source": "Local Math Engine",
-            "data": math_result
-        }
-
-    google_data = search_google(search_term, analysis)
-    framed = synthesize_search_answer(search_term, google_data, blueprint)
-
-    return {
-        "status": "success",
-        "query": search_term,
-        "detected_language": lang_profile,
-        "reply_language": reply_lang,
-        "analysis": analysis,
-        "response_blueprint": blueprint,
-        "source": google_data["provider"],
-        "search_details": google_data,
-        "framed_answer": framed,
-        "fetched_information": framed["direct_answer"],
-                               }
+    parts = [f"**{heading_main}:**\n{lead}"]
+    if rest:
+        formatted_bullets = "\n".join(f"- {item}" for item in rest)
+        parts.append(f"**{heading_points}:**\n{formatted_bullets}")
+    if blueprint.get(
