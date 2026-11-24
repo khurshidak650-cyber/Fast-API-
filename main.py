@@ -1,6 +1,6 @@
 # ==========================================
 # main.py
-# SkAi Ultimate Master API (No Gemini Key Needed - Smart Reasoning & Composer)
+# SkAi Ultimate Master API (No Gemini Key Needed)
 # ==========================================
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
@@ -16,7 +16,7 @@ import python_logic
 import javascript_logic
 import programming_engine
 
-app = FastAPI(title="SkAi Ultimate Master API", version="13.0")
+app = FastAPI(title="SkAi Ultimate Master API", version="13.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -239,28 +239,27 @@ def analyze_user_intent(text: str, lang_profile: Dict[str, str], reply_lang: Dic
 
 
 def think_through_question(query: str, analysis: Dict[str, Any], force_google: bool) -> List[str]:
-    """Khud se sochne ka step-by-step logic (bina external AI key ke)."""
     lang_code = analysis["reply_language"]["reply_language_code"]
     req_type = analysis["request_type"]
     terms = ", ".join(analysis.get("key_terms", [])) or query
     route = analysis["route_intent"]
+    use_search = force_google or route == "Neutral / General Inquiry"
 
     if lang_code == "hi":
         s1 = f"1. प्रश्न समझना: उपयोगकर्ता ने '{query}' पूछा है, जिसका मुख्य विषय '{terms}' है।"
-        s2 = f"2. उत्तर का प्रकार: यह '{req_type}' श्रेणी का प्रश्न है, इसलिए मुख्य बात पहले और स्पष्ट बिंदु उसके बाद रखे जाएंगे।"
-        s3 = f"3. स्रोत तय करना: {'लाइव वेब सर्च से तथ्य लेकर उत्तर बनाया जाएगा।' if (force_google or route == 'Neutral / General Inquiry') else f'{route} से प्राप्त जानकारी का उपयोग किया जाएगा।'}"
+        s2 = f"2. उत्तर का प्रकार: यह '{req_type}' श्रेणी का प्रश्न है, इसलिए मुख्य बात पहले रखी जाएगी।"
+        s3 = f"3. स्रोत तय करना: {'लाइव वेब सर्च से तथ्य लेकर उत्तर बनाया जाएगा।' if use_search else f'{route} से प्राप्त जानकारी का उपयोग किया जाएगा।'}"
         return [s1, s2, s3]
 
     if lang_code == "en":
         s1 = f"1. Understanding the question: The user asked '{query}', focusing on '{terms}'."
-        s2 = f"2. Answer strategy: Since this is a '{req_type}' query, I will lead with a clear direct summary followed by structured points."
-        s3 = f"3. Data source: {'Using live web search snippets to build a clear answer.' if (force_google or route == 'Neutral / General Inquiry') else f'Using {route} to solve this accurately.'}"
+        s2 = f"2. Answer strategy: Since this is a '{req_type}' query, I will lead with a clear direct summary followed by points."
+        s3 = f"3. Data source: {'Using live web search snippets to build a clear answer.' if use_search else f'Using {route} to solve this accurately.'}"
         return [s1, s2, s3]
 
-    # Hinglish / default
     s1 = f"1. Sawaal samajhna: User ne '{query}' pucha hai jiska main focus '{terms}' par hai."
-    s2 = f"2. Answer style: Yeh '{req_type}' type ka sawaal hai, isliye pehle seedha jawab aur phir clear points/example banayenge."
-    s3 = f"3. Data source: {'Live search se mile points ko samajh kar jawab tayar karenge.' if (force_google or route == 'Neutral / General Inquiry') else f'{route} ke output ko samajh kar jawab tayar karenge.'}"
+    s2 = f"2. Answer style: Yeh '{req_type}' type ka sawaal hai, isliye pehle seedha jawab aur phir clear points banayenge."
+    s3 = f"3. Data source: {'Live search se mile points ko samajh kar jawab tayar karenge.' if use_search else f'{route} ke output ko samajh kar jawab tayar karenge.'}"
     return [s1, s2, s3]
 
 
@@ -399,7 +398,6 @@ def synthesize_search_answer(query: str, search_data: Dict[str, Any], blueprint:
 
 
 def _extract_bullets_from_any(obj: Any, depth: int = 0) -> List[str]:
-    """Kisi bhi nested dict/list/str engine output se kaam ki lines nikalta hai."""
     if depth > 3 or obj is None:
         return []
     if isinstance(obj, str):
@@ -438,10 +436,6 @@ def compose_smart_answer(
     blueprint: Dict[str, Any],
     raw_data: Any,
 ) -> str:
-    """
-    Bina kisi external LLM key ke, engine ya search data ko samajh kar
-    ek saaf, structured aur helpful jawab banata hai.
-    """
     lang_code = analysis["reply_language"]["reply_language_code"]
     req_type = analysis["request_type"]
 
@@ -476,5 +470,29 @@ def compose_smart_answer(
     if rest:
         formatted_bullets = "\n".join(f"- {item}" for item in rest)
         parts.append(f"**{heading_points}:**\n{formatted_bullets}")
-    if blueprint.get(
+    if blueprint.get("style") != "concise":
+        parts.append(footer)
+
+    return "\n\n".join(parts)
+
+
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "message": "SkAi Multi-Engine Backend is Live!",
+        "google_api_configured": bool(GOOGLE_SEARCH_API_KEY and GOOGLE_CSE_ID),
+    }
+
+
+@app.post("/fetch-info")
+def fetch_web_info(request: SearchRequest):
+    search_term = request.query.strip()
+
+    if not search_term:
+        return {    if not search_term:
+        return {
+            "status": "error",
+            "message": "Query is empty."
 }
+       
