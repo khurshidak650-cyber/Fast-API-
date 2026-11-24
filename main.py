@@ -2,7 +2,7 @@
 # main.py
 # SkAi Ultimate Master API Backend (Multi-Engine Integrated)
 # ==========================================
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from pydantic import BaseModel
 import requests
@@ -16,7 +16,12 @@ import javascript_logic    # Dedicated JavaScript Engine
 import programming_engine  # Universal Engine for ALL OTHER languages (C++, Java, Rust, SQL, etc.)
 
 app = FastAPI(title="SkAi Ultimate Master API", version="8.0")
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 class SearchRequest(BaseModel):
     query: str
     language: str = "hi"
