@@ -490,9 +490,5 @@ def fetch_web_info(request: SearchRequest):
     search_term = request.query.strip()
 
     if not search_term:
-        return {    if not search_term:
         return {
-            "status": "error",
-            "message": "Query is empty."
-}
        
