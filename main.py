@@ -477,3 +477,4 @@ def compose_smart_answer(
         formatted_bullets = "\n".join(f"- {item}" for item in rest)
         parts.append(f"**{heading_points}:**\n{formatted_bullets}")
     if blueprint.get(
+}
